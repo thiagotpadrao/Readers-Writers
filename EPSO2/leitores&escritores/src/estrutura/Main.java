@@ -1,60 +1,66 @@
 package estrutura;
 
-import estrutura.threads.Reader;
-import estrutura.threads.Writer;
-import estrutura.threads.SharedControl;
+import estrutura.threads.*;
 import estrutura.dados.Data;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Main {
     
-    public static final int numReaders = 5;
-    public static final int numWriters = 5;
-    
+    public static int numReaders;
+    public static int numWriters;
     public static void main(String[] args) {
         Data data = new Data("bd.txt");
-        ReentrantLock lock = new ReentrantLock();
-        Condition canWrite = lock.newCondition();
-        SharedControl sharedControl = new SharedControl();
-
-        List<Thread> threads = new ArrayList<>();
-        populateThreadsArray(threads, data, lock, canWrite, sharedControl, numReaders, numWriters);
-
-        long startTime = System.currentTimeMillis();
-        for (Thread thread : threads) {
-            thread.start();
+        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+        boolean sameTimeReading = false;
+        for (int i = 0; i <= 100; i++) {
+            numReaders = i;
+            numWriters = 100 - i;
+    
+            long avgTime = 0;
+            long totalTime = 0;
+            for (int j = 0; j < 50; j++) {
+                List<Thread> threads = new ArrayList<>(); // Reinicie a lista para cada execução
+                populateThreadsArray(threads, data, lock, numReaders, numWriters, sameTimeReading);
+    
+                long startTime = System.currentTimeMillis();
+                for (Thread thread : threads) {
+                    thread.start();
+                }
+                for (Thread thread : threads) {
+                    try {
+                        thread.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                long endTime = System.currentTimeMillis();
+                totalTime += endTime - startTime;
+            }
+            avgTime = totalTime / 50;
+            data.logTime(i, avgTime);
         }
-
-        for (Thread thread : threads) {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    }
+    
+    private static void populateThreadsArray(List<Thread> threads, Data data, ReentrantReadWriteLock lock, int numReaders, int numWriters, boolean sameTimeReading) {
+        
+        if (sameTimeReading) {
+            for (int i = 0; i < numReaders; i++) {
+                threads.add(new Thread(new Reader(data, lock)));
+            }
+        } else {
+            for (int i = 0; i < numReaders; i++) {
+                threads.add(new Thread(new LockReader(data, lock)));
             }
         }
 
-        long endTime = System.currentTimeMillis();
-        System.out.println("Tempo total de execução: " + (endTime - startTime) + " ms");
-
-        data.logData("logFile.txt");
-    }
-
-    private static void populateThreadsArray(List<Thread> threads, Data data, ReentrantLock lock, Condition canWrite, SharedControl sharedControl, int numReaders, int numWriters) {
-        List<Thread> threadList = new ArrayList<>();
-
-        for (int i = 0; i < numReaders; i++) {
-            threadList.add(new Thread(new Reader(data, lock, canWrite, sharedControl)));
-        }
-
         for (int i = 0; i < numWriters; i++) {
-            threadList.add(new Thread(new Writer(data, lock, canWrite, sharedControl)));
+            threads.add(new Thread(new Writer(data, lock)));
         }
-
-        Collections.shuffle(threadList);
-        threads.addAll(threadList);
+    
+        Collections.shuffle(threads); // Shuffle the list of threads
     }
+    
 }

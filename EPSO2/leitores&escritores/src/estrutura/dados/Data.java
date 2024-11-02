@@ -45,6 +45,17 @@ public class Data {
         }
     }
 
+    public void logTime(int id, long avgTime) {
+        int numReaders = id;
+        int numWriters = 100 - id;
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("timeLog.txt", true))) {
+            writer.write("(Readers: " + numReaders + " | " + "Writers: " + numWriters + ") >> Time: " + avgTime + "ms");
+            writer.newLine(); // Adiciona uma nova linha após cada registro
+        } catch (IOException e) {
+            System.out.println("Erro ao criar o logfile: " + e.getMessage());
+        }
+    }    
+
     public String readData(int index) {
         return wordsList.get(index);
     }
